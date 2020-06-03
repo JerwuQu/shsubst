@@ -52,24 +52,21 @@ int main(int argc, char **argv)
 			case S_DOLLAR:
 				if (scanBuf[i] == '$') {
 					state = S_NORMAL;
-					break;
 				} else if (scanBuf[i] == '{') {
 					state = S_CAPTURE;
 					offset++;
 					captureEnd = '}';
 					captureFn = &printVar;
-					break;
 				} else if (scanBuf[i] == '(') {
 					state = S_CAPTURE;
 					offset++;
 					captureEnd = ')';
 					captureFn = &execCmd;
-					break;
+				} else {
+					putc('$', stdout);
+					state = S_NORMAL;
 				}
-
-				putc('$', stdout);
-				state = S_NORMAL;
-				// fall through
+				break;
 			case S_NORMAL:
 				if (scanBuf[i] == '$') {
 					state = S_DOLLAR;
@@ -101,8 +98,16 @@ int main(int argc, char **argv)
 		if (state == S_NORMAL) {
 			fwrite(scanBuf + offset, 1, bread - offset, stdout);
 		} else if (state == S_CAPTURE) {
-			memcpy(paramBuf + paramI, scanBuf + offset, bread - offset);
-			paramI += bread - offset;
+			const size_t sz = bread - offset;
+			if (paramI + sz >= PARAM_BUF_SZ) {
+				fprintf(stderr, "fatal error: paramBuf overflow\n");
+				return 1;
+			}
+
+			memcpy(paramBuf + paramI, scanBuf + offset, sz);
+			paramI += sz;
 		}
 	}
+
+	return 0;
 }
